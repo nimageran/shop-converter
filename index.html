@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Shop Converter</title>
+<meta name="theme-color" content="#fafafa" />
+<style>
+  :root{
+    --bg:#fafafa; --surface:#ffffff; --border:#e4e4e7;
+    --ink:#18181b; --muted:#71717a; --accent:#0f766e; --accent-ink:#ffffff;
+    --soft:#f4f4f5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0f172a; --surface:#1e293b; --border:#334155;
+           --ink:#f1f5f9; --muted:#94a3b8; --accent:#2dd4bf; --accent-ink:#0f172a;
+           --soft:#172033; }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    padding:env(safe-area-inset-top) 14px calc(28px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding-top:20px}
+
+  h1{font-size:20px;margin:0 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+
+  /* category buttons */
+  .cats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+  .cat{
+    min-height:48px;border:1px solid var(--border);background:var(--surface);
+    color:var(--ink);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .cat.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:14px}
+
+  .field{margin-bottom:12px}
+  .field:last-child{margin-bottom:0}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;letter-spacing:.02em}
+  .line{display:flex;gap:8px}
+  input[type="text"]{
+    flex:1;min-width:0;min-height:56px;padding:10px 14px;font-size:24px;font-weight:600;
+    border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+  select{
+    min-height:56px;padding:8px 10px;font-size:15px;font-weight:600;
+    border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--ink);
+    max-width:46%;
+  }
+
+  .swap{display:flex;justify-content:center;margin:-4px 0 8px}
+  .swapbtn{
+    min-height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--border);
+    background:var(--soft);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer;
+  }
+
+  .note{font-size:13px;color:var(--muted);margin-top:8px;min-height:18px}
+  .note b{color:var(--ink)}
+
+  .quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .chip{
+    padding:10px 12px;border-radius:999px;border:1px solid var(--border);
+    background:var(--soft);color:var(--ink);font-size:14px;cursor:pointer;min-height:44px;
+  }
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  tr:last-child td{border-bottom:none}
+
+  h2{font-size:15px;margin:0 0 10px}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Shop Converter</h1>
+  <p class="sub">Inch to metric and back. Fractions accepted: type 1 1/2 or 3/8.</p>
+
+  <div class="cats" id="cats"></div>
+
+  <div class="panel">
+    <div class="field">
+      <label id="labFrom">FROM</label>
+      <div class="line">
+        <input id="inA" type="text" inputmode="decimal" autocomplete="off" placeholder="0" />
+        <select id="selA"></select>
+      </div>
+    </div>
+
+    <div class="swap"><button class="swapbtn" id="swap">Swap</button></div>
+
+    <div class="field">
+      <label id="labTo">TO</label>
+      <div class="line">
+        <input id="inB" type="text" inputmode="decimal" autocomplete="off" placeholder="0" />
+        <select id="selB"></select>
+      </div>
+    </div>
+
+    <div class="note" id="note"></div>
+  </div>
+
+  <div class="panel" id="quickPanel">
+    <h2>Common sizes</h2>
+    <div class="quick" id="quick"></div>
+  </div>
+
+  <div class="panel" id="tablePanel">
+    <h2 id="tableTitle">Reference</h2>
+    <table id="refTable"></table>
+  </div>
+
+  <footer>Works offline once loaded. Add to Home Screen for a full-screen app.</footer>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Units. Every unit has a factor to the category's base unit.
+//   length base = millimetre, mass base = kilogram, and so on.
+// Converting is therefore: value -> base -> target.
+// ---------------------------------------------------------------------------
+const CATEGORIES = {
+  Length: {
+    base: 'mm',
+    units: {
+      'in':   { name: 'inch (in)',        f: 25.4 },
+      'ft':   { name: 'foot (ft)',        f: 304.8 },
+      'mm':   { name: 'millimetre (mm)',  f: 1 },
+      'cm':   { name: 'centimetre (cm)',  f: 10 },
+      'm':    { name: 'metre (m)',        f: 1000 },
+      'thou': { name: 'thou (0.001 in)',  f: 0.0254 }
+    },
+    defA: 'in', defB: 'mm'
+  },
+  Mass: {
+    base: 'kg',
+    units: {
+      'lb':  { name: 'pound (lb)',    f: 0.45359237 },
+      'oz':  { name: 'ounce (oz)',    f: 0.028349523 },
+      'kg':  { name: 'kilogram (kg)', f: 1 },
+      'g':   { name: 'gram (g)',      f: 0.001 },
+      'ton': { name: 'short ton',     f: 907.18474 },
+      't':   { name: 'tonne (1000 kg)', f: 1000 }
+    },
+    defA: 'lb', defB: 'kg'
+  },
+  Pressure: {
+    base: 'bar',
+    units: {
+      'psi': { name: 'psi',            f: 0.0689476 },
+      'bar': { name: 'bar',            f: 1 },
+      'kPa': { name: 'kilopascal (kPa)', f: 0.01 },
+      'MPa': { name: 'megapascal (MPa)', f: 10 }
+    },
+    defA: 'psi', defB: 'bar'
+  },
+  Torque: {
+    base: 'Nm',
+    units: {
+      'ftlb': { name: 'foot-pound (ft·lb)', f: 1.3558179 },
+      'inlb': { name: 'inch-pound (in·lb)', f: 0.112984829 },
+      'Nm':   { name: 'newton-metre (N·m)', f: 1 },
+      'kgm':  { name: 'kilogram-metre',     f: 9.80665 }
+    },
+    defA: 'ftlb', defB: 'Nm'
+  },
+  Flow: {
+    base: 'Lmin',
+    units: {
+      'gpm':  { name: 'US gallon/min (GPM)', f: 3.785411784 },
+      'igpm': { name: 'Imp. gallon/min',     f: 4.54609 },
+      'Lmin': { name: 'litre/min (L/min)',   f: 1 },
+      'm3h':  { name: 'cubic metre/hour',    f: 16.6666667 }
+    },
+    defA: 'gpm', defB: 'Lmin'
+  },
+  Temp: {
+    special: true,
+    units: { 'F': { name: 'Fahrenheit (°F)' }, 'C': { name: 'Celsius (°C)' } },
+    defA: 'F', defB: 'C'
+  }
+};
+
+// Common shop sizes, shown as one-tap chips.
+const QUICK = {
+  Length: ['1/8', '1/4', '3/8', '1/2', '5/8', '3/4', '1', '1 1/4', '1 1/2', '2'],
+  Mass: ['1', '5', '10', '25', '50', '100'],
+  Pressure: ['500', '1000', '1500', '2000', '2500', '3000'],
+  Torque: ['10', '25', '50', '75', '100', '150'],
+  Flow: ['1', '5', '10', '15', '20', '30'],
+  Temp: ['32', '70', '100', '150', '180', '212']
+};
+
+const STORE_KEY = 'shop_converter_v1';
+
+let category = 'Length';
+let unitA = 'in';
+let unitB = 'mm';
+let editing = 'A';          // which box the person last typed in
+
+const $ = s => document.querySelector(s);
+const inA = $('#inA'), inB = $('#inB'), selA = $('#selA'), selB = $('#selB');
+
+// ---------------------------------------------------------------------------
+// Reading a number that may be written as a fraction.
+//   "1 1/2" -> 1.5      "3/8" -> 0.375      "0.375" -> 0.375
+// ---------------------------------------------------------------------------
+function parseValue(raw) {
+  if (raw == null) return NaN;
+  let s = String(raw).trim().replace(/["”]/g, '').replace(/,/g, '');
+  if (s === '') return NaN;
+
+  const mixed = s.match(/^(-?\d+)\s+(\d+)\s*\/\s*(\d+)$/);      // 1 1/2
+  if (mixed) {
+    const whole = parseFloat(mixed[1]);
+    const frac = parseFloat(mixed[2]) / parseFloat(mixed[3]);
+    return whole < 0 ? whole - frac : whole + frac;
+  }
+
+  const simple = s.match(/^(-?\d+)\s*\/\s*(\d+)$/);             // 3/8
+  if (simple) return parseFloat(simple[1]) / parseFloat(simple[2]);
+
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+
+// Nearest fraction, for showing an inch result the way a shop writes it.
+function toFraction(value, denom = 64) {
+  if (!isFinite(value)) return '';
+  const sign = value < 0 ? '-' : '';
+  const v = Math.abs(value);
+  const whole = Math.floor(v);
+  let num = Math.round((v - whole) * denom);
+  let den = denom;
+  if (num === 0) return sign + whole;
+  if (num === den) return sign + (whole + 1);
+  while (num % 2 === 0 && den % 2 === 0) { num /= 2; den /= 2; }
+  return sign + (whole ? whole + ' ' : '') + num + '/' + den;
+}
+
+function tidy(n) {
+  if (!isFinite(n)) return '';
+  const a = Math.abs(n);
+  let digits = 3;
+  if (a >= 1000) digits = 1;
+  else if (a >= 100) digits = 2;
+  else if (a < 0.01) digits = 5;
+  return parseFloat(n.toFixed(digits)).toString();
+}
+
+function convert(value, from, to) {
+  const cat = CATEGORIES[category];
+  if (cat.special) {                                   // temperature is not a ratio
+    if (from === to) return value;
+    return from === 'F' ? (value - 32) * 5 / 9 : value * 9 / 5 + 32;
+  }
+  return value * cat.units[from].f / cat.units[to].f;
+}
+
+// ---------------------------------------------------------------------------
+// Drawing the page
+// ---------------------------------------------------------------------------
+function buildCategories() {
+  const box = $('#cats');
+  box.innerHTML = '';
+  for (const key of Object.keys(CATEGORIES)) {
+    const b = document.createElement('button');
+    b.className = 'cat' + (key === category ? ' on' : '');
+    b.textContent = key === 'Temp' ? 'Temp' : key;
+    b.addEventListener('click', () => {
+      category = key;
+      unitA = CATEGORIES[key].defA;
+      unitB = CATEGORIES[key].defB;
+      buildCategories(); buildUnits(); buildQuick(); buildTable();
+      recalc(); save();
+    });
+    box.appendChild(b);
+  }
+}
+
+function buildUnits() {
+  const units = CATEGORIES[category].units;
+  for (const [sel, current] of [[selA, unitA], [selB, unitB]]) {
+    sel.innerHTML = '';
+    for (const [key, u] of Object.entries(units)) {
+      const o = document.createElement('option');
+      o.value = key; o.textContent = u.name;
+      sel.appendChild(o);
+    }
+    sel.value = current;
+  }
+  $('#labFrom').textContent = 'FROM';
+  $('#labTo').textContent = 'TO';
+}
+
+function buildQuick() {
+  const box = $('#quick');
+  box.innerHTML = '';
+  const unit = CATEGORIES[category].defA;
+  for (const v of QUICK[category]) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = v + (category === 'Length' ? '"' : '');
+    b.addEventListener('click', () => {
+      unitA = unit; selA.value = unit;
+      inA.value = v; editing = 'A'; recalc(); save();
+    });
+    box.appendChild(b);
+  }
+}
+
+function buildTable() {
+  const rows = {
+    Length: [['1/16"', '1.59 mm'], ['1/8"', '3.18 mm'], ['1/4"', '6.35 mm'],
+             ['1/2"', '12.70 mm'], ['1"', '25.4 mm'], ['12"', '304.8 mm']],
+    Mass:   [['1 lb', '0.454 kg'], ['10 lb', '4.536 kg'], ['100 lb', '45.36 kg'],
+             ['1 kg', '2.205 lb'], ['1 short ton', '907.2 kg']],
+    Pressure: [['100 psi', '6.89 bar'], ['1000 psi', '68.95 bar'],
+               ['3000 psi', '206.8 bar'], ['1 bar', '14.5 psi']],
+    Torque: [['10 ft·lb', '13.56 N·m'], ['50 ft·lb', '67.79 N·m'],
+             ['100 ft·lb', '135.6 N·m'], ['100 N·m', '73.76 ft·lb']],
+    Flow:   [['1 GPM', '3.79 L/min'], ['10 GPM', '37.85 L/min'],
+             ['1 Imp. GPM', '4.55 L/min'], ['10 L/min', '2.64 GPM']],
+    Temp:   [['32 °F', '0 °C'], ['70 °F', '21.1 °C'], ['180 °F', '82.2 °C'],
+             ['212 °F', '100 °C']]
+  }[category];
+
+  $('#tableTitle').textContent = category + ' reference';
+  const t = $('#refTable');
+  t.innerHTML = '<tr><th>Imperial</th><th>Metric</th></tr>' +
+    rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+}
+
+function recalc() {
+  const src = editing === 'A' ? inA : inB;
+  const dst = editing === 'A' ? inB : inA;
+  const from = editing === 'A' ? unitA : unitB;
+  const to = editing === 'A' ? unitB : unitA;
+
+  const value = parseValue(src.value);
+  if (isNaN(value)) { dst.value = ''; $('#note').textContent = ''; return; }
+
+  const result = convert(value, from, to);
+  dst.value = tidy(result);
+
+  // A note that earns its place: the fraction for inch results, and the
+  // decimal for a fraction that was typed in.
+  const parts = [];
+  if (category === 'Length') {
+    if (to === 'in') parts.push('nearest fraction <b>' + toFraction(result) + '"</b>');
+    if (from === 'in' && /\//.test(src.value)) parts.push('<b>' + value + '"</b> decimal');
+    if (to === 'mm' && Math.abs(result) < 1000) parts.push('<b>' + tidy(result / 10) + '</b> cm');
+  }
+  $('#note').innerHTML = parts.join(' &nbsp;·&nbsp; ');
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({ category, unitA, unitB }));
+  } catch (e) {}
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.category && CATEGORIES[s.category]) {
+      category = s.category;
+      const units = CATEGORIES[category].units;
+      unitA = units[s.unitA] ? s.unitA : CATEGORIES[category].defA;
+      unitB = units[s.unitB] ? s.unitB : CATEGORIES[category].defB;
+    }
+  } catch (e) {}
+}
+
+// ---------------------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------------------
+inA.addEventListener('input', () => { editing = 'A'; recalc(); });
+inB.addEventListener('input', () => { editing = 'B'; recalc(); });
+
+selA.addEventListener('change', () => { unitA = selA.value; recalc(); save(); });
+selB.addEventListener('change', () => { unitB = selB.value; recalc(); save(); });
+
+$('#swap').addEventListener('click', () => {
+  [unitA, unitB] = [unitB, unitA];
+  selA.value = unitA; selB.value = unitB;
+  const av = inA.value;
+  inA.value = inB.value;
+  inB.value = av;
+  editing = 'A';
+  recalc(); save();
+});
+
+load();
+buildCategories();
+buildUnits();
+buildQuick();
+buildTable();
+inA.value = '1';
+recalc();
+</script>
+</body>
+</html>
