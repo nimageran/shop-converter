@@ -1,0 +1,13 @@
+{
+  "name": "Bench Converter",
+  "short_name": "Converter",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e9edf1",
+  "theme_color": "#e9edf1",
+  "icons": [
+    { "src": "calculator-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

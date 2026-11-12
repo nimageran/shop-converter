@@ -4,9 +4,24 @@
 <link rel="apple-touch-icon" sizes="180x180" href="calculator-icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Open full screen like an app when saved to the home screen -->
+<link rel="manifest" href="manifest.json" crossorigin="use-credentials">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Converter">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#e9edf1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#080d14" media="(prefers-color-scheme: dark)">
 <style>
   :root{ color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
   html,body{margin:0;}
+  /* Stop double-tap zoom on phones (pinch-zoom still works) */
+  html,body,button,input,.key{touch-action:manipulation;}
+  /* App feel: no page bounce, no grey tap flash, no text selection / callout on buttons */
+  html{background:var(--bg);overscroll-behavior:none;-webkit-text-size-adjust:100%;}
+  body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}
+  button,.key,.chip,label{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
   img{max-width:100%;}
   [hidden]{display:none !important;}
 </style>
